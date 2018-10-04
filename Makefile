@@ -50,7 +50,7 @@ $(GODOWNLOADER): $(DEP)
 .PHONY: build
 build: $(BIN)/fossa
 
-$(BIN)/fossa: $(GO_BINDATA) $(GENNY) $(DEP) $(shell find . -name *.go)
+$(BIN)/fossa: $(GO_BINDATA) $(GENNY) $(DEP) $(shell find . -type f -name "*.go")
 	dep check
 	go generate ./...
 	go build -o $@ $(LDFLAGS) github.com/fossas/fossa-cli/cmd/fossa
