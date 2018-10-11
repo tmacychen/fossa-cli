@@ -111,6 +111,7 @@ func Handler(entry *log.Entry) error {
 	}
 
 	// Write entry to log file.
+	// TODO(leo): should log `error.Error`s differently?
 	data, err := json.Marshal(entry)
 	if err != nil {
 		// There are some entries that we can't serialize to JSON (for example, a

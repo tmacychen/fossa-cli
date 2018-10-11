@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"reflect"
 	"strings"
 
 	"github.com/apex/log"
@@ -51,9 +53,12 @@ var App = cli.App{
 func main() {
 	defer func() {
 		if r := recover(); r != nil {
-
+			fmt.Printf("%#v\n", r)
+			fmt.Printf("%#v\n", reflect.TypeOf(r).Name())
 		}
 	}()
+	bad := []string{"1"}
+	fmt.Println(bad[6])
 	err := App.Run(os.Args)
 	if err != nil {
 		log.WithError(err).Error("fatal error")

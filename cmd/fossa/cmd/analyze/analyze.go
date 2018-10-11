@@ -46,7 +46,7 @@ func Run(ctx *cli.Context) error {
 		case fossa.ErrMissingAPIKey:
 			return &errors.Error{
 				Code:    "E_MISSING_API_KEY",
-				Type:    errors.UserInput,
+				Type:    errors.User,
 				Message: "A FOSSA API key is needed to run this command.",
 				Troubleshooting: `
 ` + wordwrap.WrapString("Running `fossa analyze` performs a dependency analysis and uploads the result to FOSSA. To run an analysis without uploading results, run:", 78) + `

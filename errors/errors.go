@@ -14,7 +14,7 @@ type Type int
 // logged during errors.
 const (
 	_ Type = iota
-	UserInput
+	User
 	Build
 	VCS
 	System
