@@ -24,10 +24,11 @@ const (
 // Error is our domain-specific error implementation for providing user-friendly
 // error messages.
 type Error struct {
-	ExitCode        int
-	Code            string
-	Type            Type
-	Cause           error
+	Code     string
+	ExitCode int
+	Type     Type
+	Cause    error
+
 	Message         string
 	Troubleshooting string
 }

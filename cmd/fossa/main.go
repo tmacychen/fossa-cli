@@ -12,6 +12,7 @@ import (
 	"github.com/fossas/fossa-cli/api/fossa"
 	"github.com/fossas/fossa-cli/config"
 	"github.com/fossas/fossa-cli/errors"
+	log2 "github.com/fossas/fossa-cli/log"
 
 	"github.com/fossas/fossa-cli/cmd/fossa/display"
 	"github.com/fossas/fossa-cli/cmd/fossa/flags"
@@ -57,8 +58,23 @@ func main() {
 			fmt.Printf("%#v\n", reflect.TypeOf(r).Name())
 		}
 	}()
-	bad := []string{"1"}
-	fmt.Println(bad[6])
+
+	log2.Warn(log2.Warning{
+		Code:         "W_TEST_WARNING",
+		Message:      "This is a warning",
+		Instructions: "Here are instructions to resolve this warning. It shouldn't be too long.",
+		URL:          "https://example.com/docs/this-warning",
+	})
+
+	log2.Warn(log2.Warning{
+		Message:      "This is some other warning",
+		Instructions: "Make sure to frog blast the vent core.",
+		URL:          "https://example.com/docs/vent-core-needs-frog-blasting",
+	})
+	// os.Exit(0)
+	// bad := []string{"1"}
+	// fmt.Println(bad[6])
+
 	err := App.Run(os.Args)
 	if err != nil {
 		log.WithError(err).Error("fatal error")
