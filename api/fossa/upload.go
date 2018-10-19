@@ -1,114 +1,91 @@
 package fossa
 
 import (
-	"encoding/json"
-	"net/url"
-
-	"github.com/pkg/errors"
+	"errors"
 
 	"github.com/apex/log"
-	"github.com/fossas/fossa-cli/cmd/fossa/version"
+
+	"github.com/fossas/fossa-cli/cmd/fossa/display"
+	"github.com/fossas/fossa-cli/config"
 )
 
-// Errors related to preconditions.
 var (
-	ErrNoProject   = errors.New("no project provided for upload")
-	ErrNoRevision  = errors.New("no revision provided for upload")
-	ErrNoBuildData = errors.New("no build data to upload")
+	ErrForbidden        = errors.New("you do not have permission to upload builds for this project (is the API key correct?)")
+	ErrEmptyDataUpload  = errors.New("No data to upload")
+	ErrRevisionInvalid  = errors.New("Could not infer revision name from `git` remote named `origin`. To submit a custom project, set Fetcher to `custom` in `.fossa.yml`")
+	ErrProjectIdInvalid = errors.New("Could not infer project name from either `.fossa.yml` or `git` remote named `origin`")
 )
 
-// Errors resulting from a bad API response.
-var (
-	ErrForbidden            = errors.New("authentication failed (is the API key correct?)")
-	ErrRevisionDoesNotExist = errors.New("revision does not exist (are the project and revision correct and published in FOSSA?)")
-)
+func UploadAnalysis(normalized []SourceUnit) (Locator, error) {
+	latestSupportedVersion, err := GetLatestSupportedAPIVersion()
+	if err != nil {
+		return Locator{}, err
+	}
 
-// UploadOptions are optional keys that provide extra metadata for an upload.
-type UploadOptions struct {
-	Branch         string
-	ProjectURL     string
-	JIRAProjectKey string
-	Link           string
-	Team           string
+	switch latestSupportedVersion {
+	case "v1":
+		return uploadAnalysisV1(normalized)
+	case "v0":
+		fallthrough
+	default:
+		if latestSupportedVersion == "" {
+			log.Warn("Could not find any compatible and supported API versions. Attempting to use the v0 upload path.")
+		}
+
+		return uploadAnalysisV0(normalized)
+	}
 }
 
-// Upload uploads a project's analysis.
-func Upload(title string, locator Locator, options UploadOptions, data []SourceUnit) (Locator, error) {
-	// Check preconditions.
-	if locator.Fetcher == "git" && locator.Revision == "" {
-		return Locator{}, errors.New("Could not infer revision name from `git` remote named `origin`. To submit a custom project, set Fetcher to `custom` in `.fossa.yml`")
-	}
-	if locator.Project == "" {
-		return Locator{}, errors.New("Could not infer project name from either `.fossa.yml` or `git` remote named `origin`")
-	}
-	if len(data) == 0 {
-		return Locator{}, errors.New("No data to upload")
+func uploadAnalysisV1(normalized []SourceUnit) (Locator, error) {
+	uploadBody := V1UploadBody{
+		Analysis: normalized,
 	}
 
-	payload, err := json.Marshal(data)
+	uploadBody.Project.ID = config.Project()
+	uploadBody.Project.Team = config.Team()
+	uploadBody.Project.URL = config.ProjectURL()
+	uploadBody.Project.Title = config.Title()
+	uploadBody.Project.JIRA = config.JIRAProjectKey()
+
+	uploadBody.Revision.Link = config.Link()
+	uploadBody.Revision.ID = config.Revision()
+
+	uploadBody.VCS.Reference = config.Branch()
+
+	if config.VCS() != nil {
+		uploadBody.VCS.Type = "git"
+	} else {
+		uploadBody.VCS.Type = "none"
+	}
+
+	locator, err := UploadV1(uploadBody)
+	display.ClearProgress()
 	if err != nil {
-		return Locator{}, errors.Wrap(err, "could not marshal upload data")
+		log.Fatalf("Error during upload: %s", err.Error())
 	}
-	log.WithFields(log.Fields{
-		"modules": data,
-		"payload": string(payload),
-	}).Debug("uploading build")
+	return locator, nil
+}
 
-	q := url.Values{}
-	q.Add("locator", locator.String())
-	q.Add("v", version.ShortString())
-	if locator.Fetcher == "custom" {
-		q.Add("managedBuild", "true")
-		q.Add("title", title)
-	}
-
-	if options.Branch != "" {
-		q.Add("branch", options.Branch)
-	}
-	if options.ProjectURL != "" {
-		q.Add("projectURL", options.ProjectURL)
-	}
-	if options.JIRAProjectKey != "" {
-		q.Add("jiraProjectKey", options.JIRAProjectKey)
-	}
-	if options.Link != "" {
-		q.Add("link", options.Link)
-	}
-	if options.Team != "" {
-		q.Add("team", options.Team)
-	}
-
-	endpoint, err := url.Parse("/api/builds/custom?" + q.Encode())
+func uploadAnalysisV0(normalized []SourceUnit) (Locator, error) {
+	locator, err := UploadV0(
+		config.Title(),
+		Locator{
+			Fetcher:  config.Fetcher(),
+			Project:  config.Project(),
+			Revision: config.Revision(),
+		},
+		UploadOptions{
+			Branch:         config.Branch(),
+			ProjectURL:     config.ProjectURL(),
+			JIRAProjectKey: config.JIRAProjectKey(),
+			Link:           config.Link(),
+			Team:           config.Team(),
+		},
+		normalized)
+	display.ClearProgress()
 	if err != nil {
-		return Locator{}, errors.New("Failed to generate upload URL")
+		log.Fatalf("Error during upload: %s", err.Error())
+		return Locator{}, err
 	}
-	log.WithField("endpoint", endpoint.String()).Debug("uploading build")
-
-	res, statusCode, err := Post(endpoint.String(), payload)
-	log.WithField("response", res).Debug("build upload completed")
-
-	if statusCode == 428 {
-		// TODO: handle "Managed Project" workflow
-		return Locator{}, errors.New("invalid project or revision; make sure this version is published and FOSSA has access to your repo (to submit a custom project, set Fetcher to `custom` in `.fossa.yml`)")
-	} else if statusCode == 403 {
-		return Locator{}, errors.New("you do not have permission to upload builds for this project")
-	} else if err != nil {
-		return Locator{}, errors.Wrap(err, "could not upload")
-	}
-	log.Debug("build upload succeeded")
-
-	var unmarshalled struct {
-		Locator string
-		Error   string
-	}
-	err = json.Unmarshal([]byte(res), &unmarshalled)
-	if err != nil || unmarshalled.Error != "" {
-		return Locator{}, errors.Errorf("Error response from API: %s", res)
-	}
-
-	if unmarshalled.Locator == "" {
-		return Locator{}, errors.Errorf("bad response: %s", res)
-	}
-
-	return ReadLocator(unmarshalled.Locator), nil
+	return locator, nil
 }

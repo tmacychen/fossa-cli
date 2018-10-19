@@ -3,9 +3,9 @@ package analyze
 import (
 	"fmt"
 
+	"github.com/apex/log"
 	"github.com/urfave/cli"
 
-	"github.com/apex/log"
 	"github.com/fossas/fossa-cli/analyzers"
 	"github.com/fossas/fossa-cli/api/fossa"
 	"github.com/fossas/fossa-cli/cmd/fossa/display"
@@ -75,7 +75,15 @@ func Run(ctx *cli.Context) error {
 		return nil
 	}
 
-	return uploadAnalysis(normalized)
+	display.InProgress("Uploading analysis...")
+	locator, err := fossa.UploadAnalysis(normalized)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println(locator.ReportURL())
+
+	return nil
 }
 
 func Do(modules []module.Module) (analyzed []module.Module, err error) {
@@ -130,30 +138,4 @@ func Do(modules []module.Module) (analyzed []module.Module, err error) {
 	display.ClearProgress()
 
 	return analyzed, err
-}
-
-func uploadAnalysis(normalized []fossa.SourceUnit) error {
-	display.InProgress("Uploading analysis...")
-	locator, err := fossa.Upload(
-		config.Title(),
-		fossa.Locator{
-			Fetcher:  config.Fetcher(),
-			Project:  config.Project(),
-			Revision: config.Revision(),
-		},
-		fossa.UploadOptions{
-			Branch:         config.Branch(),
-			ProjectURL:     config.ProjectURL(),
-			JIRAProjectKey: config.JIRAProjectKey(),
-			Link:           config.Link(),
-			Team:           config.Team(),
-		},
-		normalized)
-	display.ClearProgress()
-	if err != nil {
-		log.Fatalf("Error during upload: %s", err.Error())
-		return err
-	}
-	fmt.Println(locator.ReportURL())
-	return nil
 }

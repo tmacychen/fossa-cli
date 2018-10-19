@@ -9,6 +9,7 @@ import (
 
 	"github.com/apex/log"
 	isatty "github.com/mattn/go-isatty"
+	git "gopkg.in/src-d/go-git.v4"
 
 	"github.com/fossas/fossa-cli/cmd/fossa/flags"
 	"github.com/fossas/fossa-cli/module"
@@ -84,6 +85,10 @@ func Revision() string {
 		}
 	}
 	return TryStrings(StringFlag(flags.Revision), file.Revision(), inferred)
+}
+
+func VCS() *git.Repository {
+	return repo
 }
 
 func Branch() string {
