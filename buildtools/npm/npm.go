@@ -14,7 +14,7 @@ type Options struct {
 }
 
 type NPM interface {
-	List(dir string) (Output, error)
+	List(dir string, allDeps bool) (Output, error)
 	Clean(dir string) error
 	Install(dir string) error
 	Exists() bool
@@ -36,10 +36,14 @@ func (n SystemNPM) Exists() bool {
 	return n.Cmd != ""
 }
 
-func (n SystemNPM) List(dir string) (Output, error) {
+func (n SystemNPM) List(dir string, allDeps bool) (Output, error) {
+	arguments := []string{"ls", "--json"}
+	if !allDeps {
+		arguments = append(arguments, "--production")
+	}
 	stdout, _, err := exec.Run(exec.Cmd{
 		Name: n.Cmd,
-		Argv: []string{"ls", "--json", "--production"},
+		Argv: arguments,
 		Dir:  dir,
 	})
 	log.Debugf("err: %#v", err)

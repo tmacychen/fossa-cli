@@ -57,8 +57,9 @@ type Analyzer struct {
 // If no strategies are specified, the analyzer will try each of these
 // strategies in descending order.
 type Options struct {
-	Strategy    string `mapstructure:"strategy"`
-	AllowNPMErr bool   `mapstructure:"allow-npm-err"`
+	Strategy        string `mapstructure:"strategy"`
+	AllowNPMErr     bool   `mapstructure:"allow-npm-err"`
+	AllDependencies bool   `mapstructure:"all-dependencies"`
 }
 
 // New configures Node, NPM, and Yarn commands.
@@ -217,7 +218,7 @@ func (a *Analyzer) Analyze() (graph.Deps, error) {
 	log.Debugf("Running Nodejs analysis: %#v", a.Module)
 	// if npm as a tool does not exist, skip this
 	if a.NPM.Exists() {
-		pkgs, err := a.NPM.List(a.Module.BuildTarget)
+		pkgs, err := a.NPM.List(a.Module.BuildTarget, a.Options.AllDependencies)
 		if err == nil {
 			// TODO: we should move this functionality in to the buildtool, and have it
 			// return `pkg.Package`s.
