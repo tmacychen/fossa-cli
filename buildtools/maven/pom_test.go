@@ -8,11 +8,14 @@ import (
 
 	"github.com/fossas/fossa-cli/buildtools/maven"
 	"github.com/fossas/fossa-cli/pkg"
+	"github.com/fossas/fossa-cli/testing/helpers"
 )
 
-func TestGraphFromTarget(t *testing.T) {
+func TestPomFileGraph(t *testing.T) {
 	// This test needs just the Dependencies field of a Manifest to be translated to a graph.Deps.
-	projectDir := testdataDir
+
+	projectDir := filepath.Join(testPoms, "nested")
+	projectTarget := filepath.Join("deep-nested", "pom.xml")
 
 	id1 := pkg.ID{Type: pkg.Maven, Name: "com.google.code.g:g", Revision: "2.7"}
 	id2 := pkg.ID{Type: pkg.Maven, Name: "javax.annotation:jsr250-api", Revision: "1.0.2"}
@@ -29,26 +32,37 @@ func TestGraphFromTarget(t *testing.T) {
 		id3: {ID: id3},
 	}
 
-	got, err := maven.GraphFromTarget(projectDir)
+	got, err := maven.PomFileGraph(projectTarget, projectDir)
 	assert.NoError(t, err)
 	assert.Equal(t, wantDirect, got.Direct)
 	assert.Equal(t, wantTransitive, got.Transitive)
 }
 
-func TestResolveManifestFromBuildTarget(t *testing.T) {
+func TestPomFileDependencyManagement(t *testing.T) {
+	got, err := maven.PomFileGraph("dependencyManagement.xml", testPoms)
+	assert.NoError(t, err)
+	assert.Len(t, got.Direct, 1)
+	helpers.AssertPackageImport(t, got.Direct, "junit:junit", "3.8.2")
+
+	assert.Len(t, got.Transitive, 1)
+	packageOne := helpers.PackageInTransitiveGraph(got.Transitive, "junit:junit", "3.8.2")
+	assert.NotEmpty(t, packageOne)
+	assert.Len(t, packageOne.Imports, 0)
+}
+func TestResolveManifestFromTarget(t *testing.T) {
 	// A directory path.
-	pom, err := maven.ResolveManifestFromBuildTarget(testdataDir)
+	pom, err := maven.ResolveManifestFromTarget(testPoms, ".")
 	if assert.NoError(t, err) {
 		assert.Equal(t, "com.domain.name:stuff", pom.GroupID+":"+pom.ArtifactID)
 	}
 
 	// A POM file path.
-	pom2, err := maven.ResolveManifestFromBuildTarget(filepath.Join(testdataDir, "nested", "pom.xml"))
+	pom2, err := maven.ResolveManifestFromTarget(filepath.Join(testPoms, "nested", "pom.xml"), ".")
 	if assert.NoError(t, err) {
 		assert.Equal(t, "com.someone.code.a:gson-extras", pom2.GroupID+":"+pom2.ArtifactID)
 	}
 
 	// A project identifier.
-	_, err3 := maven.ResolveManifestFromBuildTarget("something:else")
+	_, err3 := maven.ResolveManifestFromTarget("something:else", ".")
 	assert.Error(t, err3)
 }

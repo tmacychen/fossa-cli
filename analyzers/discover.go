@@ -11,6 +11,7 @@ import (
 	"github.com/fossas/fossa-cli/analyzers/debian"
 	"github.com/fossas/fossa-cli/analyzers/golang"
 	"github.com/fossas/fossa-cli/analyzers/gradle"
+	"github.com/fossas/fossa-cli/analyzers/haskell"
 	"github.com/fossas/fossa-cli/analyzers/maven"
 	"github.com/fossas/fossa-cli/analyzers/nodejs"
 	"github.com/fossas/fossa-cli/analyzers/nuget"
@@ -18,6 +19,7 @@ import (
 	"github.com/fossas/fossa-cli/analyzers/php"
 	"github.com/fossas/fossa-cli/analyzers/python"
 	"github.com/fossas/fossa-cli/analyzers/ruby"
+	"github.com/fossas/fossa-cli/analyzers/rust"
 	"github.com/fossas/fossa-cli/analyzers/scala"
 	"github.com/fossas/fossa-cli/module"
 )
@@ -36,12 +38,14 @@ func Discover(dir string, options map[string]interface{}) ([]module.Module, erro
 		php.Discover,
 		golang.Discover,
 		gradle.Discover,
+		haskell.Discover,
 		maven.Discover,
 		nodejs.Discover,
 		nuget.Discover,
 		okbuck.Discover,
 		python.Discover,
 		ruby.Discover,
+		rust.Discover,
 		scala.Discover,
 	}
 

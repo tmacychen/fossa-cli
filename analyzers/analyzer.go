@@ -12,6 +12,7 @@ import (
 	"github.com/fossas/fossa-cli/analyzers/debian"
 	"github.com/fossas/fossa-cli/analyzers/golang"
 	"github.com/fossas/fossa-cli/analyzers/gradle"
+	"github.com/fossas/fossa-cli/analyzers/haskell"
 	"github.com/fossas/fossa-cli/analyzers/maven"
 	"github.com/fossas/fossa-cli/analyzers/nodejs"
 	"github.com/fossas/fossa-cli/analyzers/nuget"
@@ -19,6 +20,7 @@ import (
 	"github.com/fossas/fossa-cli/analyzers/php"
 	"github.com/fossas/fossa-cli/analyzers/python"
 	"github.com/fossas/fossa-cli/analyzers/ruby"
+	"github.com/fossas/fossa-cli/analyzers/rust"
 	"github.com/fossas/fossa-cli/analyzers/scala"
 	"github.com/fossas/fossa-cli/graph"
 	"github.com/fossas/fossa-cli/module"
@@ -61,6 +63,8 @@ func New(m module.Module) (Analyzer, error) {
 		return golang.New(m)
 	case pkg.Gradle:
 		return gradle.New(m)
+	case pkg.Haskell:
+		return haskell.New(m)
 	case pkg.Maven:
 		return maven.New(m)
 	case pkg.NodeJS:
@@ -73,6 +77,8 @@ func New(m module.Module) (Analyzer, error) {
 		return python.New(m)
 	case pkg.Ruby:
 		return ruby.New(m)
+	case pkg.Rust:
+		return rust.New(m)
 	case pkg.Scala:
 		return scala.New(m)
 	case pkg.Buck:

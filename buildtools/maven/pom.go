@@ -15,16 +15,17 @@ import (
 
 // A Manifest represents a POM manifest file.
 type Manifest struct {
-	Project      xml.Name     `xml:"project"`
-	Parent       Parent       `xml:"parent"`
-	Modules      []string     `xml:"modules>module"`
-	ArtifactID   string       `xml:"artifactId"`
-	GroupID      string       `xml:"groupId"`
-	Version      string       `xml:"version"`
-	Description  string       `xml:"description"`
-	Name         string       `xml:"name"`
-	URL          string       `xml:"url"`
-	Dependencies []Dependency `xml:"dependencies>dependency"`
+	Project              xml.Name     `xml:"project"`
+	Parent               Parent       `xml:"parent"`
+	Modules              []string     `xml:"modules>module"`
+	ArtifactID           string       `xml:"artifactId"`
+	GroupID              string       `xml:"groupId"`
+	Version              string       `xml:"version"`
+	Description          string       `xml:"description"`
+	Name                 string       `xml:"name"`
+	URL                  string       `xml:"url"`
+	Dependencies         []Dependency `xml:"dependencies>dependency"`
+	DependencyManagement []Dependency `xml:"dependencyManagement>dependencies>dependency"`
 }
 
 type Parent struct {
@@ -49,19 +50,23 @@ func (d Dependency) ID() string {
 	return d.GroupId + ":" + d.ArtifactId
 }
 
-// GraphFromTarget returns simply the list of dependencies listed within the manifest file.
-func GraphFromTarget(buildTarget string) (graph.Deps, error) {
-	pom, err := ResolveManifestFromBuildTarget(buildTarget)
+// PomFileGraph returns simply the list of dependencies listed within the manifest file.
+func PomFileGraph(target, dir string) (graph.Deps, error) {
+	pom, err := ResolveManifestFromTarget(target, dir)
 	if err != nil {
 		return graph.Deps{}, err
 	}
+
+	// Aggregate `dependencies` and `dependencyManagement` fields.
+	dependencyList := combineDependencies(pom.Dependencies, pom.DependencyManagement)
+
 	deps := graph.Deps{
-		Direct:     depsListToImports(pom.Dependencies),
+		Direct:     depsListToImports(dependencyList),
 		Transitive: make(map[pkg.ID]pkg.Package),
 	}
 
 	// From just a POM file we don't know what really depends on what, so list all imports in the graph.
-	for _, dep := range pom.Dependencies {
+	for _, dep := range dependencyList {
 		pack := pkg.Package{
 			ID: pkg.ID{
 				Type:     pkg.Maven,
@@ -75,25 +80,22 @@ func GraphFromTarget(buildTarget string) (graph.Deps, error) {
 	return deps, nil
 }
 
-// ResolveManifestFromBuildTarget tries to determine what buildTarget is supposed to be and then reads the POM
-// manifest file pointed to by buildTarget if it is a path to such a file or module.
-func ResolveManifestFromBuildTarget(buildTarget string) (*Manifest, error) {
-	var pomFile string
-	stat, err := os.Stat(buildTarget)
+// ResolveManifestFromTarget tries to determine what target is supposed to be and then reads the POM
+// manifest file pointed to by target if it is a path to such a file or module.
+func ResolveManifestFromTarget(target, dir string) (*Manifest, error) {
+	pomFile := filepath.Join(dir, target)
+	stat, err := os.Stat(pomFile)
 	if err != nil {
-		// buildTarget is not a path.
-		if strings.Count(buildTarget, ":") == 1 {
+		// target is not a path.
+		if strings.Count(target, ":") == 1 {
 			// This is likely a module ID.
-			return nil, errors.Errorf("cannot identify POM file for module %q", buildTarget)
+			return nil, errors.Errorf("cannot identify POM file for module %q", target)
 		}
-		return nil, errors.Errorf("manifest file for %q cannot be read", buildTarget)
+		return nil, errors.Wrapf(err, "manifest file for %q cannot be read", target)
 	}
 	if stat.IsDir() {
 		// We have the directory and will assume it uses the standard name for the manifest file.
-		pomFile = filepath.Join(buildTarget, "pom.xml")
-	} else {
-		// We have the manifest file but still need its directory path.
-		pomFile = buildTarget
+		pomFile = filepath.Join(target, "pom.xml")
 	}
 
 	var pom Manifest
@@ -101,4 +103,19 @@ func ResolveManifestFromBuildTarget(buildTarget string) (*Manifest, error) {
 		return nil, err
 	}
 	return &pom, nil
+}
+
+// combineDependencies combines and dedupes two lists of Dependencies.
+func combineDependencies(listOne, listTwo []Dependency) []Dependency {
+	mergedList := listOne
+	listOneMap := make(map[Dependency]bool)
+	for _, dep := range listOne {
+		listOneMap[dep] = true
+	}
+	for _, dep := range listTwo {
+		if _, exists := listOneMap[dep]; !exists {
+			mergedList = append(mergedList, dep)
+		}
+	}
+	return mergedList
 }
